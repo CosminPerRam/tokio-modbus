@@ -20,7 +20,7 @@ pub mod sync;
 
 /// Transport independent asynchronous client trait
 #[async_trait]
-pub trait Client: SlaveContext + Send {
+pub trait Client: SlaveContext + Send + Sync {
     /// Invokes a _Modbus_ function.
     async fn call(&mut self, request: Request<'_>) -> Result<Response>;
 

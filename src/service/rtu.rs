@@ -118,7 +118,7 @@ impl<T> SlaveContext for Client<T> {
 #[async_trait::async_trait]
 impl<T> crate::client::Client for Client<T>
 where
-    T: AsyncRead + AsyncWrite + Send + Unpin,
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin,
 {
     async fn call(&mut self, req: Request<'_>) -> Result<Response> {
         self.call(req).await

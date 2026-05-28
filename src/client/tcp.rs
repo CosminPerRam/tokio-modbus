@@ -31,7 +31,7 @@ pub async fn connect_slave(socket_addr: SocketAddr, slave: Slave) -> io::Result<
 /// The connection could either be an ordinary [`TcpStream`] or a TLS connection.
 pub fn attach<T>(transport: T) -> Context
 where
-    T: AsyncRead + AsyncWrite + Send + Unpin + fmt::Debug + 'static,
+    T: AsyncRead + AsyncWrite + Sync + Send + Unpin + fmt::Debug + 'static,
 {
     attach_slave(transport, Slave::tcp_device())
 }
@@ -41,7 +41,7 @@ where
 /// The connection could either be an ordinary [`TcpStream`] or a TLS connection.
 pub fn attach_slave<T>(transport: T, slave: Slave) -> Context
 where
-    T: AsyncRead + AsyncWrite + Send + Unpin + fmt::Debug + 'static,
+    T: AsyncRead + AsyncWrite + Sync + Send + Unpin + fmt::Debug + 'static,
 {
     let client = crate::service::tcp::Client::new(transport, slave);
     Context {
