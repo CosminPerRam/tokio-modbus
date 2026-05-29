@@ -45,7 +45,7 @@ impl Service for TestService {
 }
 
 // TODO: Update the `assert_eq` with a check on Exception once Client trait can return Exception
-pub async fn check_client_context(mut ctx: Context) {
+pub async fn check_client_context(ctx: Context) {
     let response = ctx.read_coils(0x00, 2).await.unwrap();
     assert!(matches!(response, Err(ExceptionCode::Acknowledge)));
 

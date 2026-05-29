@@ -41,7 +41,11 @@ pub fn connect_slave_with_timeout(
         .build()?;
     // SerialStream::open requires a runtime at least on cfg(unix).
     let serial = block_on_with_timeout(&runtime, timeout, async { SerialStream::open(builder) })?;
-    let async_ctx = crate::client::rtu::attach_slave(serial, slave);
+    // `attach_slave` spawns the connection actor, so it must run within the runtime.
+    let async_ctx = {
+        let _guard = runtime.enter();
+        crate::client::rtu::attach_slave(serial, slave)
+    };
     let sync_ctx = Context {
         runtime,
         async_ctx,

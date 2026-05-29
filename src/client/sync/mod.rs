@@ -123,7 +123,7 @@ impl Client for Context {
 }
 
 impl SlaveContext for Context {
-    fn set_slave(&mut self, slave: Slave) {
+    fn set_slave(&self, slave: Slave) {
         self.async_ctx.set_slave(slave);
     }
 }

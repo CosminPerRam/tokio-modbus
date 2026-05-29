@@ -54,7 +54,7 @@ async fn client_context(socket_addr: SocketAddr) -> anyhow::Result<()> {
     // Give the server some time for starting up
     tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let mut ctx = client::tcp::connect(socket_addr).await?;
+    let ctx = client::tcp::connect(socket_addr).await?;
 
     let max_iterations = 1000;
     let mut iterations = 1;

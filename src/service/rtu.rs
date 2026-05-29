@@ -4,129 +4,116 @@
 use std::io;
 
 use futures_util::{SinkExt as _, StreamExt as _};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::mpsc,
+};
 use tokio_util::codec::Framed;
 
 use crate::{
-    ProtocolError, Result, codec,
+    ExceptionResponse, ProtocolError, Request, Response, Result, Slave, codec,
     frame::{rtu::*, *},
-    slave::*,
+    slave::SlaveId,
 };
 
-use super::{disconnect, verify_response_header};
+use super::{Command, Handle, REQUEST_CHANNEL_BOUND, disconnect, verify_response_header};
 
-/// Modbus RTU client
-#[derive(Debug)]
-pub(crate) struct Client<T> {
-    framed: Option<Framed<T, codec::rtu::ClientCodec>>,
-    slave_id: SlaveId,
+/// Spawn a connection actor for `transport` and return a handle to it.
+///
+/// Must be called from within a _Tokio_ runtime, as it spawns a background task.
+pub(crate) fn new<T>(transport: T, slave: Slave) -> Handle
+where
+    T: AsyncRead + AsyncWrite + Send + Unpin + 'static,
+{
+    let framed = Framed::new(transport, codec::rtu::ClientCodec::default());
+    let (command_tx, command_rx) = mpsc::channel(REQUEST_CHANNEL_BOUND);
+    tokio::spawn(run_actor(framed, command_rx));
+    Handle::new(command_tx, slave)
 }
 
-impl<T> Client<T>
+/// Connection actor: owns the framed transport and serves commands until all
+/// handles are dropped or an explicit disconnect is requested.
+async fn run_actor<T>(
+    mut framed: Framed<T, codec::rtu::ClientCodec>,
+    mut command_rx: mpsc::Receiver<Command>,
+) where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    while let Some(command) = command_rx.recv().await {
+        match command {
+            Command::Call {
+                request,
+                slave,
+                response_tx,
+            } => {
+                let result = call(&mut framed, slave, request).await;
+                // Ignore send errors: the caller may have gone away (e.g. timed out).
+                drop(response_tx.send(result));
+            }
+            Command::Disconnect { response_tx } => {
+                drop(response_tx.send(disconnect(framed).await));
+                return;
+            }
+        }
+    }
+    // All handles dropped: drop the connection (mirrors dropping the old client).
+}
+
+async fn call<T>(
+    framed: &mut Framed<T, codec::rtu::ClientCodec>,
+    slave: Slave,
+    req: Request<'_>,
+) -> Result<Response>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    pub(crate) fn new(transport: T, slave: Slave) -> Self {
-        let framed = Framed::new(transport, codec::rtu::ClientCodec::default());
-        let slave_id = slave.into();
-        Self {
-            slave_id,
-            framed: Some(framed),
+    log::debug!("Call {req:?}");
+
+    let req_function_code = req.function_code();
+    let slave_id: SlaveId = slave.into();
+    let req_adu = RequestAdu {
+        hdr: Header { slave_id },
+        pdu: RequestPdu::from(req),
+    };
+    let req_hdr = req_adu.hdr;
+
+    framed.read_buffer_mut().clear();
+    framed.send(req_adu).await?;
+
+    let res_adu = framed
+        .next()
+        .await
+        .unwrap_or_else(|| Err(io::Error::from(io::ErrorKind::BrokenPipe)))?;
+    let ResponseAdu {
+        hdr: res_hdr,
+        pdu: res_pdu,
+    } = res_adu;
+    let ResponsePdu(result) = res_pdu;
+
+    // Match headers of request and response.
+    if let Err(message) = verify_response_header(&req_hdr, &res_hdr) {
+        return Err(ProtocolError::HeaderMismatch { message, result }.into());
+    }
+
+    // Match function codes of request and response.
+    let rsp_function_code = match &result {
+        Ok(response) => response.function_code(),
+        Err(ExceptionResponse { function, .. }) => *function,
+    };
+    if req_function_code != rsp_function_code {
+        return Err(ProtocolError::FunctionCodeMismatch {
+            request: req_function_code,
+            result,
         }
+        .into());
     }
 
-    fn framed(&mut self) -> io::Result<&mut Framed<T, codec::rtu::ClientCodec>> {
-        let Some(framed) = &mut self.framed else {
-            return Err(io::Error::new(io::ErrorKind::NotConnected, "disconnected"));
-        };
-        Ok(framed)
-    }
-
-    fn next_request_adu<'a, R>(&self, req: R) -> RequestAdu<'a>
-    where
-        R: Into<RequestPdu<'a>>,
-    {
-        let slave_id = self.slave_id;
-        let hdr = Header { slave_id };
-        let pdu = req.into();
-        RequestAdu { hdr, pdu }
-    }
-
-    async fn call(&mut self, req: Request<'_>) -> Result<Response> {
-        log::debug!("Call {req:?}");
-
-        let req_function_code = req.function_code();
-        let req_adu = self.next_request_adu(req);
-        let req_hdr = req_adu.hdr;
-
-        let framed = self.framed()?;
-
-        framed.read_buffer_mut().clear();
-        framed.send(req_adu).await?;
-
-        let res_adu = framed
-            .next()
-            .await
-            .unwrap_or_else(|| Err(io::Error::from(io::ErrorKind::BrokenPipe)))?;
-        let ResponseAdu {
-            hdr: res_hdr,
-            pdu: res_pdu,
-        } = res_adu;
-        let ResponsePdu(result) = res_pdu;
-
-        // Match headers of request and response.
-        if let Err(message) = verify_response_header(&req_hdr, &res_hdr) {
-            return Err(ProtocolError::HeaderMismatch { message, result }.into());
-        }
-
-        // Match function codes of request and response.
-        let rsp_function_code = match &result {
-            Ok(response) => response.function_code(),
-            Err(ExceptionResponse { function, .. }) => *function,
-        };
-        if req_function_code != rsp_function_code {
-            return Err(ProtocolError::FunctionCodeMismatch {
-                request: req_function_code,
-                result,
-            }
-            .into());
-        }
-
-        Ok(result.map_err(
-            |ExceptionResponse {
-                 function: _,
-                 exception,
-             }| exception,
-        ))
-    }
-
-    async fn disconnect(&mut self) -> io::Result<()> {
-        let Some(framed) = self.framed.take() else {
-            // Already disconnected.
-            return Ok(());
-        };
-        disconnect(framed).await
-    }
-}
-
-impl<T> SlaveContext for Client<T> {
-    fn set_slave(&mut self, slave: Slave) {
-        self.slave_id = slave.into();
-    }
-}
-
-#[async_trait::async_trait]
-impl<T> crate::client::Client for Client<T>
-where
-    T: AsyncRead + AsyncWrite + Send + Sync + Unpin,
-{
-    async fn call(&mut self, req: Request<'_>) -> Result<Response> {
-        self.call(req).await
-    }
-
-    async fn disconnect(&mut self) -> io::Result<()> {
-        self.disconnect().await
-    }
+    Ok(result.map_err(
+        |ExceptionResponse {
+             function: _,
+             exception,
+         }| exception,
+    ))
 }
 
 #[cfg(test)]
@@ -140,6 +127,7 @@ mod tests {
 
     use crate::{
         Error,
+        client::Client as _,
         service::{rtu::Header, verify_response_header},
     };
 
@@ -201,8 +189,8 @@ mod tests {
     #[tokio::test]
     async fn handle_broken_pipe() {
         let transport = MockTransport;
-        let mut client =
-            crate::service::rtu::Client::new(transport, crate::service::rtu::Slave::broadcast());
+        let client =
+            crate::service::rtu::new(transport, crate::service::rtu::Slave::broadcast());
         let res = client
             .call(crate::service::rtu::Request::ReadCoils(0x00, 5))
             .await;

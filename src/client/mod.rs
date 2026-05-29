@@ -22,7 +22,7 @@ pub mod sync;
 #[async_trait]
 pub trait Client: SlaveContext + Send + Sync {
     /// Invokes a _Modbus_ function.
-    async fn call(&mut self, request: Request<'_>) -> Result<Response>;
+    async fn call(&self, request: Request<'_>) -> Result<Response>;
 
     /// Disconnects the client.
     ///
@@ -33,30 +33,30 @@ pub trait Client: SlaveContext + Send + Sync {
     /// beforehand should also work and free all resources. The
     /// actual behavior might depend on the underlying transport
     /// protocol (RTU/TCP) that is used by the client.
-    async fn disconnect(&mut self) -> io::Result<()>;
+    async fn disconnect(&self) -> io::Result<()>;
 }
 
 /// Asynchronous _Modbus_ reader
 #[async_trait]
 pub trait Reader: Client {
     /// Read multiple coils (0x01)
-    async fn read_coils(&mut self, addr: Address, cnt: Quantity) -> Result<Vec<Coil>>;
+    async fn read_coils(&self, addr: Address, cnt: Quantity) -> Result<Vec<Coil>>;
 
     /// Read multiple discrete inputs (0x02)
-    async fn read_discrete_inputs(&mut self, addr: Address, cnt: Quantity) -> Result<Vec<Coil>>;
+    async fn read_discrete_inputs(&self, addr: Address, cnt: Quantity) -> Result<Vec<Coil>>;
 
     /// Read multiple holding registers (0x03)
-    async fn read_holding_registers(&mut self, addr: Address, cnt: Quantity) -> Result<Vec<Word>>;
+    async fn read_holding_registers(&self, addr: Address, cnt: Quantity) -> Result<Vec<Word>>;
 
     /// Read multiple input registers (0x04)
-    async fn read_input_registers(&mut self, addr: Address, cnt: Quantity) -> Result<Vec<Word>>;
+    async fn read_input_registers(&self, addr: Address, cnt: Quantity) -> Result<Vec<Word>>;
 
     /// Read and write multiple holding registers (0x17)
     ///
     /// The write operation is performed before the read unlike
     /// the name of the operation might suggest!
     async fn read_write_multiple_registers(
-        &mut self,
+        &self,
         read_addr: Address,
         read_count: Quantity,
         write_addr: Address,
@@ -65,16 +65,16 @@ pub trait Reader: Client {
 
     /// Read file records (`0x14`)
     async fn read_file_record(
-        &mut self,
+        &self,
         sub_requests: &[ReadFileRecordSubRequest],
     ) -> Result<Vec<ReadFileRecordSubResponse>>;
 
     /// Read FIFO queue (`0x18`)
-    async fn read_fifo_queue(&mut self, addr: Address) -> Result<Vec<Word>>;
+    async fn read_fifo_queue(&self, addr: Address) -> Result<Vec<Word>>;
 
     /// Read device identification (`0x2B` / `0x0E`)
     async fn read_device_identification(
-        &mut self,
+        &self,
         read_code: ReadCode,
         object_id: ObjectId,
     ) -> Result<ReadDeviceIdentificationResponse>;
@@ -84,20 +84,20 @@ pub trait Reader: Client {
 #[async_trait]
 pub trait Writer: Client {
     /// Write a single coil (0x05)
-    async fn write_single_coil(&mut self, addr: Address, coil: Coil) -> Result<()>;
+    async fn write_single_coil(&self, addr: Address, coil: Coil) -> Result<()>;
 
     /// Write a single holding register (0x06)
-    async fn write_single_register(&mut self, addr: Address, word: Word) -> Result<()>;
+    async fn write_single_register(&self, addr: Address, word: Word) -> Result<()>;
 
     /// Write multiple coils (0x0F)
-    async fn write_multiple_coils(&mut self, addr: Address, coils: &'_ [Coil]) -> Result<()>;
+    async fn write_multiple_coils(&self, addr: Address, coils: &'_ [Coil]) -> Result<()>;
 
     /// Write multiple holding registers (0x10)
-    async fn write_multiple_registers(&mut self, addr: Address, words: &[Word]) -> Result<()>;
+    async fn write_multiple_registers(&self, addr: Address, words: &[Word]) -> Result<()>;
 
     /// Set or clear individual bits of a holding register (0x16)
     async fn masked_write_register(
-        &mut self,
+        &self,
         addr: Address,
         and_mask: Word,
         or_mask: Word,
@@ -105,7 +105,7 @@ pub trait Writer: Client {
 
     /// Write file records (`0x15`)
     async fn write_file_record(
-        &mut self,
+        &self,
         sub_requests: &[WriteFileRecordSubRequest],
     ) -> Result<Vec<WriteFileRecordSubRequest>>;
 }
@@ -130,24 +130,24 @@ impl From<Context> for Box<dyn Client> {
 
 #[async_trait]
 impl Client for Context {
-    async fn call(&mut self, request: Request<'_>) -> Result<Response> {
+    async fn call(&self, request: Request<'_>) -> Result<Response> {
         self.client.call(request).await
     }
 
-    async fn disconnect(&mut self) -> io::Result<()> {
+    async fn disconnect(&self) -> io::Result<()> {
         self.client.disconnect().await
     }
 }
 
 impl SlaveContext for Context {
-    fn set_slave(&mut self, slave: Slave) {
+    fn set_slave(&self, slave: Slave) {
         self.client.set_slave(slave);
     }
 }
 
 #[async_trait]
 impl Reader for Context {
-    async fn read_coils<'a>(&'a mut self, addr: Address, cnt: Quantity) -> Result<Vec<Coil>> {
+    async fn read_coils<'a>(&'a self, addr: Address, cnt: Quantity) -> Result<Vec<Coil>> {
         self.client
             .call(Request::ReadCoils(addr, cnt))
             .await
@@ -164,7 +164,7 @@ impl Reader for Context {
     }
 
     async fn read_discrete_inputs<'a>(
-        &'a mut self,
+        &'a self,
         addr: Address,
         cnt: Quantity,
     ) -> Result<Vec<Coil>> {
@@ -184,7 +184,7 @@ impl Reader for Context {
     }
 
     async fn read_input_registers<'a>(
-        &'a mut self,
+        &'a self,
         addr: Address,
         cnt: Quantity,
     ) -> Result<Vec<Word>> {
@@ -203,7 +203,7 @@ impl Reader for Context {
     }
 
     async fn read_holding_registers<'a>(
-        &'a mut self,
+        &'a self,
         addr: Address,
         cnt: Quantity,
     ) -> Result<Vec<Word>> {
@@ -222,7 +222,7 @@ impl Reader for Context {
     }
 
     async fn read_write_multiple_registers<'a>(
-        &'a mut self,
+        &'a self,
         read_addr: Address,
         read_count: Quantity,
         write_addr: Address,
@@ -248,7 +248,7 @@ impl Reader for Context {
     }
 
     async fn read_file_record(
-        &mut self,
+        &self,
         sub_requests: &[ReadFileRecordSubRequest],
     ) -> Result<Vec<ReadFileRecordSubResponse>> {
         self.client
@@ -262,7 +262,7 @@ impl Reader for Context {
             })
     }
 
-    async fn read_fifo_queue(&mut self, addr: Address) -> Result<Vec<Word>> {
+    async fn read_fifo_queue(&self, addr: Address) -> Result<Vec<Word>> {
         self.client
             .call(Request::ReadFifoQueue(addr))
             .await
@@ -275,7 +275,7 @@ impl Reader for Context {
     }
 
     async fn read_device_identification(
-        &mut self,
+        &self,
         read_code: ReadCode,
         object_id: ObjectId,
     ) -> Result<ReadDeviceIdentificationResponse> {
@@ -293,7 +293,7 @@ impl Reader for Context {
 
 #[async_trait]
 impl Writer for Context {
-    async fn write_single_coil<'a>(&'a mut self, addr: Address, coil: Coil) -> Result<()> {
+    async fn write_single_coil<'a>(&'a self, addr: Address, coil: Coil) -> Result<()> {
         self.client
             .call(Request::WriteSingleCoil(addr, coil))
             .await
@@ -308,7 +308,7 @@ impl Writer for Context {
             })
     }
 
-    async fn write_multiple_coils<'a>(&'a mut self, addr: Address, coils: &[Coil]) -> Result<()> {
+    async fn write_multiple_coils<'a>(&'a self, addr: Address, coils: &[Coil]) -> Result<()> {
         let cnt = coils.len();
         self.client
             .call(Request::WriteMultipleCoils(addr, Cow::Borrowed(coils)))
@@ -324,7 +324,7 @@ impl Writer for Context {
             })
     }
 
-    async fn write_single_register<'a>(&'a mut self, addr: Address, word: Word) -> Result<()> {
+    async fn write_single_register<'a>(&'a self, addr: Address, word: Word) -> Result<()> {
         self.client
             .call(Request::WriteSingleRegister(addr, word))
             .await
@@ -340,7 +340,7 @@ impl Writer for Context {
     }
 
     async fn write_multiple_registers<'a>(
-        &'a mut self,
+        &'a self,
         addr: Address,
         data: &[Word],
     ) -> Result<()> {
@@ -360,7 +360,7 @@ impl Writer for Context {
     }
 
     async fn masked_write_register<'a>(
-        &'a mut self,
+        &'a self,
         addr: Address,
         and_mask: Word,
         or_mask: Word,
@@ -381,7 +381,7 @@ impl Writer for Context {
     }
 
     async fn write_file_record(
-        &mut self,
+        &self,
         sub_requests: &[WriteFileRecordSubRequest],
     ) -> Result<Vec<WriteFileRecordSubRequest>> {
         self.client
@@ -405,31 +405,31 @@ mod tests {
 
     #[derive(Default, Debug)]
     pub(crate) struct ClientMock {
-        slave: Option<Slave>,
+        slave: Mutex<Option<Slave>>,
         last_request: Mutex<Option<Request<'static>>>,
-        next_response: Option<Result<Response>>,
+        next_response: Mutex<Option<Result<Response>>>,
     }
 
     #[allow(dead_code)]
     impl ClientMock {
         pub(crate) fn slave(&self) -> Option<Slave> {
-            self.slave
+            *self.slave.lock().unwrap()
         }
 
         pub(crate) fn last_request(&self) -> &Mutex<Option<Request<'static>>> {
             &self.last_request
         }
 
-        pub(crate) fn set_next_response(&mut self, next_response: Result<Response>) {
-            self.next_response = Some(next_response);
+        pub(crate) fn set_next_response(&self, next_response: Result<Response>) {
+            *self.next_response.lock().unwrap() = Some(next_response);
         }
     }
 
     #[async_trait]
     impl Client for ClientMock {
-        async fn call(&mut self, request: Request<'_>) -> Result<Response> {
+        async fn call(&self, request: Request<'_>) -> Result<Response> {
             *self.last_request.lock().unwrap() = Some(request.into_owned());
-            match self.next_response.take().unwrap() {
+            match self.next_response.lock().unwrap().take().unwrap() {
                 Ok(response) => Ok(response),
                 Err(Error::Transport(err)) => {
                     Err(io::Error::new(err.kind(), format!("{err}")).into())
@@ -438,14 +438,14 @@ mod tests {
             }
         }
 
-        async fn disconnect(&mut self) -> io::Result<()> {
+        async fn disconnect(&self) -> io::Result<()> {
             Ok(())
         }
     }
 
     impl SlaveContext for ClientMock {
-        fn set_slave(&mut self, slave: Slave) {
-            self.slave = Some(slave);
+        fn set_slave(&self, slave: Slave) {
+            *self.slave.lock().unwrap() = Some(slave);
         }
     }
 
@@ -455,9 +455,9 @@ mod tests {
         // a multiple of 8 coils.
         let response_coils = [true, false, false, true, false, true, false, true];
         for num_coils in 1..8 {
-            let mut client = Box::<ClientMock>::default();
+            let client = Box::<ClientMock>::default();
             client.set_next_response(Ok(Ok(Response::ReadCoils(response_coils.to_vec()))));
-            let mut context = Context { client };
+            let context = Context { client };
             context.set_slave(Slave(1));
             let coils = futures::executor::block_on(context.read_coils(1, num_coils))
                 .unwrap()
@@ -472,11 +472,11 @@ mod tests {
         // a multiple of 8 coils.
         let response_inputs = [true, false, false, true, false, true, false, true];
         for num_inputs in 1..8 {
-            let mut client = Box::<ClientMock>::default();
+            let client = Box::<ClientMock>::default();
             client.set_next_response(Ok(Ok(Response::ReadDiscreteInputs(
                 response_inputs.to_vec(),
             ))));
-            let mut context = Context { client };
+            let context = Context { client };
             context.set_slave(Slave(1));
             let inputs = futures::executor::block_on(context.read_discrete_inputs(1, num_inputs))
                 .unwrap()

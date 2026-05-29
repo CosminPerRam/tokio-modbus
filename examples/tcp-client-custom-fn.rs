@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let socket_addr = "192.168.0.222:502".parse().unwrap();
 
-    let mut ctx = tcp::connect(socket_addr).await?;
+    let ctx = tcp::connect(socket_addr).await?;
 
     println!("Fetching the coupler ID");
     let rsp = ctx

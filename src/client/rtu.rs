@@ -21,7 +21,7 @@ pub fn attach_slave<T>(transport: T, slave: Slave) -> Context
 where
     T: AsyncRead + AsyncWrite + Unpin + Sync + Send + 'static,
 {
-    let client = crate::service::rtu::Client::new(transport, slave);
+    let client = crate::service::rtu::new(transport, slave);
     Context {
         client: Box::new(client),
     }

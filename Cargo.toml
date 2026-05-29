@@ -55,8 +55,8 @@ rustls-pki-types = { version = "1.14.0", features = ["std"] }
 
 [features]
 default = ["rtu", "tcp"]
-rtu = ["dep:futures-core", "futures-util/sink", "dep:smallvec", "dep:tokio-util"]
-tcp = ["dep:futures-core", "futures-util/sink", "tokio/net", "dep:tokio-util"]
+rtu = ["dep:futures-core", "futures-util/sink", "dep:smallvec", "dep:tokio-util", "tokio/rt", "tokio/sync"]
+tcp = ["dep:futures-core", "futures-util/sink", "tokio/net", "dep:tokio-util", "tokio/rt", "tokio/sync"]
 rtu-sync = ["rtu", "sync", "dep:tokio-serial"]
 tcp-sync = ["tcp", "sync"]
 rtu-server = ["rtu", "server", "tokio/macros", "dep:tokio-serial"]

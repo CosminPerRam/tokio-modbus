@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let transport = connector.connect(domain, stream).await?;
 
     // Tokio modbus transport layer setup
-    let mut ctx = tcp::attach(transport);
+    let ctx = tcp::attach(transport);
 
     println!("Reading Holding Registers");
     let data = ctx.read_holding_registers(40000, 68).await?;

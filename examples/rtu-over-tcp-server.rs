@@ -157,7 +157,7 @@ async fn client_context(socket_addr: SocketAddr) {
 
             println!("CLIENT: Connecting client...");
             let transport = tokio::net::TcpStream::connect(socket_addr).await.unwrap();
-            let mut ctx = tokio_modbus::prelude::rtu::attach_slave(transport, Slave(1));
+            let ctx = tokio_modbus::prelude::rtu::attach_slave(transport, Slave(1));
 
             println!("CLIENT: Reading 2 input registers...");
             let response = ctx.read_input_registers(0x00, 2).await.unwrap();

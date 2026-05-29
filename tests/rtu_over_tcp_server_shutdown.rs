@@ -63,7 +63,7 @@ async fn client_context(socket_addr: SocketAddr, sender: Sender<()>) {
     tokio::time::sleep(Duration::from_millis(100)).await;
     // Connect to server
     let transport = tokio::net::TcpStream::connect(socket_addr).await.unwrap();
-    let mut ctx = tokio_modbus::prelude::rtu::attach_slave(transport, Slave(1));
+    let ctx = tokio_modbus::prelude::rtu::attach_slave(transport, Slave(1));
     // Check that a request receives a response
     assert!(ctx.read_input_registers(0, 1).await.is_ok());
     // Stop the server

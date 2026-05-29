@@ -117,7 +117,7 @@ impl fmt::Display for Slave {
 /// on the context. This library consistently adopted the term *slave*.
 pub trait SlaveContext {
     /// Select a slave device for all subsequent outgoing requests.
-    fn set_slave(&mut self, slave: Slave);
+    fn set_slave(&self, slave: Slave);
 }
 
 #[cfg(test)]

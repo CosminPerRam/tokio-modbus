@@ -63,7 +63,7 @@ async fn client_context(socket_addr: SocketAddr, sender: Sender<()>) {
     // Give the server some time for starting up
     tokio::time::sleep(Duration::from_millis(100)).await;
     // Connect to server
-    let mut ctx = client::tcp::connect(socket_addr).await.unwrap();
+    let ctx = client::tcp::connect(socket_addr).await.unwrap();
     // Check that a request receives a response
     assert!(ctx.read_input_registers(0, 1).await.is_ok());
     // Stop the server

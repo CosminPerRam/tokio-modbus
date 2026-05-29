@@ -233,7 +233,7 @@ async fn client_context(socket_addr: SocketAddr) {
             let transport = connector.connect(domain, stream).await.unwrap();
 
             // Tokio modbus transport layer setup
-            let mut ctx = tcp::attach(transport);
+            let ctx = tcp::attach(transport);
 
             println!("CLIENT: Reading 2 input registers...");
             let response = ctx.read_input_registers(0x00, 2).await.unwrap();

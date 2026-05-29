@@ -155,7 +155,7 @@ async fn client_context(socket_addr: SocketAddr) {
             tokio::time::sleep(Duration::from_secs(1)).await;
 
             println!("CLIENT: Connecting client...");
-            let mut ctx = tcp::connect(socket_addr).await.unwrap();
+            let ctx = tcp::connect(socket_addr).await.unwrap();
 
             println!("CLIENT: Reading 2 input registers...");
             let response = ctx.read_input_registers(0x00, 2).await.unwrap();

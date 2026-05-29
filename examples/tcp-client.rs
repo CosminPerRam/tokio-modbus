@@ -9,7 +9,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let socket_addr = "127.0.0.1:5502".parse().unwrap();
 
-    let mut ctx = tcp::connect(socket_addr).await?;
+    let ctx = tcp::connect(socket_addr).await?;
 
     println!("Fetching the coupler ID");
     let data = ctx.read_input_registers(0x1000, 7).await??;
